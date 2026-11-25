@@ -1,0 +1,43 @@
+name: Migrate David invitation to new repository
+on:
+  push:
+    paths:
+      - '.github/workflows/migrate-invitation.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy published invitation and update paths
+        run: |
+          git clone --depth 1 --branch main https://github.com/AuraDigitalJal/david-eduardo-16.git /tmp/original-invitation
+          python - <<'PY'
+          import shutil, subprocess, hashlib
+          from pathlib import Path
+          src=Path('/tmp/original-invitation')
+          files=subprocess.check_output(['git','-C',str(src),'ls-files','-z']).decode().split('\0')
+          files=[x for x in files if x and not x.startswith('.github/')]
+          assert len(files)>=30
+          for name in files:
+              dst=Path(name)
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(src/name,dst)
+              assert hashlib.sha256(dst.read_bytes()).digest()==hashlib.sha256((src/name).read_bytes()).digest()
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          old='https://auradigitaljal.com/david-eduardo-16/'
+          new='https://auradigitaljal.com/David-Eduardo-15/'
+          assert s.count(old)==4
+          s=s.replace(old,new)
+          assert all(x in s for x in ['portada-xv.png','padres-xv.png','apertura-xv.mp4','whatsapp-preview-xv.jpg','de-cover-countdown'])
+          p.write_text(s,encoding='utf-8')
+          print('Migrated and verified',len(files),'files')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .nojekyll assets index.html config.json
+          git commit -m "Migrate complete XV invitation and update share URLs"
+          git push
